@@ -1,0 +1,56 @@
+# Default values for DoltDB cluster.
+
+## @param version DoltDB service version.
+version: "2.1.10"
+
+## @param topology DoltDB topology. Supported values: standalone, replication.
+topology: standalone
+
+## @param replication creation-time replication topology settings.
+replication:
+  ## @param replication.standbyReplicas number of standby replicas. Valid when topology=replication. Range: 1..5.
+  standbyReplicas: 1
+
+## @param database optional initial database name created by the Dolt server image.
+database: ""
+
+## @param tlsEnable enable KubeBlocks-managed TLS for the SQL listener.
+tlsEnable: false
+
+## Restore this cluster from a KubeBlocks Backup through Cluster.spec.restore.
+## KubeBlocks creates the DataProtection Restore CR automatically during restore.
+restore:
+  enabled: false
+  source:
+    apiGroup: dataprotection.kubeblocks.io
+    kind: Backup
+    name: ""
+    namespace: ""
+  parameters:
+    dataprotection.kubeblocks.io/volume-restore-policy: Parallel
+    dataprotection.kubeblocks.io/source-target-name: doltdb
+
+## Dolt SQL server configuration variables. Changes require a component restart.
+config:
+  enabled: true
+  logLevel: info
+  logFormat: text
+  readOnly: "false"
+  autocommit: "true"
+  transactionCommit: "false"
+  autoGcEnabled: "true"
+  maxConnections: "1000"
+  backLog: "50"
+  maxConnectionsTimeoutMillis: "60000"
+  readTimeoutMillis: "28800000"
+  writeTimeoutMillis: "28800000"
+
+## Resources.
+cpu: 1
+memory: 1
+storageClassName: ""
+storage: 20
+
+## Customized default values to override kblib chart's values.
+extra:
+  terminationPolicy: Delete
