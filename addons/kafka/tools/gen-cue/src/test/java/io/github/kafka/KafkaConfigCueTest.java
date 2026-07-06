@@ -4,8 +4,12 @@ import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.server.config.AbstractKafkaConfig;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -82,14 +86,16 @@ class KafkaConfigCueTest {
         String cue = KafkaConfigCue.renderScopedDefinitionsForTest(shared, controller, broker);
 
         assertTrue(cue.contains("#Shared: {"));
-        assertTrue(cue.contains("#Controller: #Shared & {"));
-        assertTrue(cue.contains("#Broker: #Shared & {"));
-        assertTrue(cue.contains("#Combined: #Controller & #Broker"));
+        assertTrue(cue.contains("#Controller: {\n\t#Shared\n"));
+        assertTrue(cue.contains("#Broker: {\n\t#Shared\n"));
+        assertTrue(cue.contains("#Combined: {\n\t#Shared\n"));
         assertTrue(section(cue, "#Shared:", "#Controller:").contains("\"shared.string\""));
         assertTrue(section(cue, "#Controller:", "#Broker:").contains("\"controller.string\""));
         assertTrue(section(cue, "#Broker:", "#Combined:").contains("\"broker.string\""));
-        assertTrue(section(cue, "#Controller:", "#Broker:").contains("\t...\n"));
-        assertTrue(section(cue, "#Broker:", "#Combined:").contains("\t...\n"));
+        assertTrue(section(cue, "#Combined:", "}\n").contains("\"controller.string\""));
+        assertTrue(section(cue, "#Combined:", "}\n").contains("\"broker.string\""));
+        assertFalse(section(cue, "#Controller:", "#Broker:").contains("\t...\n"));
+        assertFalse(section(cue, "#Broker:", "#Combined:").contains("\t...\n"));
     }
 
     @Test
@@ -102,7 +108,7 @@ class KafkaConfigCueTest {
         assertTrue(cue.contains("#Shared"));
         assertTrue(cue.contains("#Controller"));
         assertTrue(cue.contains("#Broker"));
-        assertTrue(cue.contains("#Combined: #Controller & #Broker"));
+        assertTrue(cue.contains("#Combined: {\n\t#Shared\n"));
         assertTrue(section(cue, "#Shared:", "#Controller:").contains("\"num.network.threads\""));
         assertTrue(section(cue, "#Controller:", "#Broker:").contains("\"controller.quorum.voters\""));
         assertTrue(section(cue, "#Controller:", "#Broker:").contains("\"metadata.log.dir\""));
@@ -110,10 +116,20 @@ class KafkaConfigCueTest {
         assertTrue(section(cue, "#Broker:", "#Combined:").contains("\"log.retention.ms\""));
         assertTrue(section(cue, "#Broker:", "#Combined:").contains("\"group.initial.rebalance.delay.ms\""));
         assertFalse(section(cue, "#Broker:", "#Combined:").contains("\"delete.topic.enable\""));
+        assertTrue(section(cue, "#Combined:", "}\n").contains("\"controller.quorum.voters\""));
+        assertTrue(section(cue, "#Combined:", "}\n").contains("\"log.retention.ms\""));
         assertTrue(cue.contains("// \"advertised.listeners\"?: *null | string | null"));
         assertTrue(cue.contains("// \"process.roles\"?: *[] | [...(\"broker\" | \"controller\")]"));
         assertTrue(cue.contains("// \"ssl.keystore.type\"?: *\"JKS\" | string"));
         assertEquals(nonInternalKafkaConfigNames(), renderedConfigNames(cue));
+    }
+
+    @Test
+    void generatedSchemaCoversDefaultServerProperties() throws IOException {
+        Set<String> missing = defaultServerPropertiesKeys();
+        missing.removeAll(renderedConfigNames(KafkaConfigCue.render()));
+
+        assertEquals(Set.of(), missing);
     }
 
     private static String section(String text, String start, String end) {
@@ -139,6 +155,22 @@ class KafkaConfigCueTest {
         for (ConfigDef.ConfigKey key : AbstractKafkaConfig.CONFIG_DEF.configKeys().values()) {
             if (!key.internalConfig) {
                 names.add(key.name);
+            }
+        }
+        return names;
+    }
+
+    private static Set<String> defaultServerPropertiesKeys() throws IOException {
+        Path path = Path.of("../../configs/kafka-server.prop.tpl");
+        Set<String> names = new TreeSet<>();
+        for (String line : Files.readAllLines(path)) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int separator = trimmed.indexOf('=');
+            if (separator > 0) {
+                names.add(trimmed.substring(0, separator));
             }
         }
         return names;

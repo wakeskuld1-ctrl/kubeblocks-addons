@@ -159,7 +159,7 @@ public final class KafkaConfigCue {
         out.append('\n');
         renderRoleDefinition(out, "Broker", keys.get(Scope.BROKER), disabledConfigs);
         out.append('\n');
-        out.append("#Combined: #Controller & #Broker\n");
+        renderCombinedDefinition(out, keys, disabledConfigs);
     }
 
     private static Map<Scope, Map<String, ConfigDef.ConfigKey>> collectConfigKeys(List<ScopedConfigSource> sources) {
@@ -221,9 +221,23 @@ public final class KafkaConfigCue {
         String definitionName,
         Map<String, ConfigDef.ConfigKey> keys,
         Set<String> disabledConfigs) {
-        out.append("#").append(definitionName).append(": #Shared & {\n");
+        out.append("#").append(definitionName).append(": {\n");
+        out.append("\t#Shared\n");
         renderKeys(out, keys, disabledConfigs);
-        out.append("\t...\n");
+        out.append("}\n");
+    }
+
+    private static void renderCombinedDefinition(
+            StringBuilder out,
+            Map<Scope, Map<String, ConfigDef.ConfigKey>> keys,
+            Set<String> disabledConfigs) {
+        Map<String, ConfigDef.ConfigKey> combinedKeys = new LinkedHashMap<>();
+        combinedKeys.putAll(keys.get(Scope.CONTROLLER));
+        combinedKeys.putAll(keys.get(Scope.BROKER));
+
+        out.append("#Combined: {\n");
+        out.append("\t#Shared\n");
+        renderKeys(out, combinedKeys, disabledConfigs);
         out.append("}\n");
     }
 

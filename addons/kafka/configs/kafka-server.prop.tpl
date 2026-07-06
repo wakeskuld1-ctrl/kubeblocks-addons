@@ -251,9 +251,6 @@ password.encoder.iterations=4096
 # log.dirs=
 # log.dir=/tmp/kafka-logs
 
-# acl
-allow.everyone.if.no.acl.found=true
-
 # deprecated with kraft version
 # inter.broker.protocol.version=3.4-IV0
 # broker.id.generation.enable=true
